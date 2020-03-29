@@ -26,6 +26,7 @@ public class Main {
         // 引数からファイル名を取得
         String swaggerFileName = "swagger.yaml";
         String outputDirName = "mock-json";
+        Boolean noEmptyFile = false;
         List<String> arguments = Arrays.asList(args);
         int swaggerIndex = arguments.indexOf("-i");
         if (swaggerIndex >= 0) {
@@ -37,11 +38,16 @@ public class Main {
             outputDirName = args[outputIndex + 1];
         }
 
+        if (arguments.contains("--noEmptyFile")) {
+            noEmptyFile = true;
+        }
+
         OpenAPI swagger = new OpenAPIV3Parser().read(swaggerFileName);
         Components components = swagger.getComponents();
         Map<String, Schema> schemas = components.getSchemas();
 
         String finalOutputDirName = outputDirName;
+        Boolean finalNoEmptyFile = noEmptyFile;
         swagger.getPaths().entrySet()
                 .stream()
                 .forEach(path -> {
@@ -49,22 +55,22 @@ public class Main {
 
                     Operation get = item.getGet();
                     if (get != null) {
-                        write(get.getResponses(), schemas, "get", path.getKey(), finalOutputDirName);
+                        write(get.getResponses(), schemas, "get", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
 
                     Operation post = item.getPost();
                     if (post != null) {
-                        write(post.getResponses(), schemas, "post", path.getKey(), finalOutputDirName);
+                        write(post.getResponses(), schemas, "post", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
 
                     Operation put = item.getPut();
                     if (put != null) {
-                        write(put.getResponses(), schemas, "put", path.getKey(), finalOutputDirName);
+                        write(put.getResponses(), schemas, "put", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
 
                     Operation delete = item.getDelete();
                     if (delete != null) {
-                        write(delete.getResponses(), schemas, "delete", path.getKey(), finalOutputDirName);
+                        write(delete.getResponses(), schemas, "delete", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
                 });
     }
@@ -75,7 +81,8 @@ public class Main {
             Map<String, Schema> schemas,
             String method,
             String path,
-            String outputDir
+            String outputDir,
+            Boolean noEmptyFile
     ) {
         // 200系のみJSONの対象にする
         Pattern pattern = Pattern.compile("20.");
@@ -83,7 +90,7 @@ public class Main {
                 .filter(response -> pattern.matcher(response.getKey()).find())
                 .forEach(response -> {
                     try {
-                        write(response.getValue(), schemas, method, path, outputDir);
+                        write(response.getValue(), schemas, method, path, outputDir, noEmptyFile);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -96,12 +103,14 @@ public class Main {
             Map<String, Schema> schemas,
             String method,
             String path,
-            String outputDir
+            String outputDir,
+            Boolean noEmptyFile
     ) throws IOException {
         String fileName = method + path.replace("/", "-").replace("{","_").replace("}","") + ".json";
+        // レスポンスのなく、noEmptyFileフラグが立っている場合はファイル作成不要
         if (response.getContent() == null) {
-            // レスポンスのない場合はファイル作成不要
-            // write(fileName, "");
+            if (noEmptyFile) return;
+            write(fileName, "", outputDir);
             return;
         }
 
