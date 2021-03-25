@@ -9,7 +9,9 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.parser.OpenAPIV3Parser;
@@ -56,21 +58,25 @@ public class Main {
                     Operation get = item.getGet();
                     if (get != null) {
                         write(get.getResponses(), schemas, "get", path.getKey(), finalOutputDirName, finalNoEmptyFile);
+                        write(get.getRequestBody(), schemas, "get", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
 
                     Operation post = item.getPost();
                     if (post != null) {
                         write(post.getResponses(), schemas, "post", path.getKey(), finalOutputDirName, finalNoEmptyFile);
+                        write(post.getRequestBody(), schemas, "post", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
 
                     Operation put = item.getPut();
                     if (put != null) {
                         write(put.getResponses(), schemas, "put", path.getKey(), finalOutputDirName, finalNoEmptyFile);
+                        write(put.getRequestBody(), schemas, "put", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
 
                     Operation delete = item.getDelete();
                     if (delete != null) {
                         write(delete.getResponses(), schemas, "delete", path.getKey(), finalOutputDirName, finalNoEmptyFile);
+                        write(delete.getRequestBody(), schemas, "delete", path.getKey(), finalOutputDirName, finalNoEmptyFile);
                     }
                 });
     }
@@ -120,6 +126,50 @@ public class Main {
 
         Example example = ExampleBuilder.fromSchema(schema, schemas);
         write(fileName, toJsonString(example), outputDir);
+    }
+
+    // リクエストを書き込み
+    private static void write(
+            RequestBody request,
+            Map<String, Schema> schemas,
+            String method,
+            String path,
+            String outputDir,
+            Boolean noEmptyFile
+    ) {
+        String fileName = "rqruest-" + method + path.replace("/", "-").replace("{","_").replace("}","") + ".json";
+        // レスポンスのなく、noEmptyFileフラグが立っている場合はファイル作成不要
+        if (request == null || request.getContent() == null) {
+            if (noEmptyFile) return;
+            try {
+                write(fileName, "", outputDir);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        MediaType type = request.getContent()
+                .get("application/json");
+
+        if (type == null) {
+            if (noEmptyFile) return;
+            try {
+                write(fileName, "", outputDir);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        Schema schema = type.getSchema();
+
+        Example example = ExampleBuilder.fromSchema(schema, schemas);
+        try {
+            write(fileName, toJsonString(example), outputDir);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static String toJsonString(Example example) {
